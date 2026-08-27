@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>УФСБ по ДНР | MST: Операция</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background-image: url('background.jpg'); 
+      background-size: cover; 
+      background-position: center; 
+      background-attachment: fixed; 
+      font-family: 'Segoe UI', Arial, sans-serif; 
+      display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; 
+    }
+
+    .container { max-width: 1100px; width: 100%; }
+    
+    .site-card { 
+      background: rgba(20, 26, 33, 0.95); border: 1px solid #b89b6b; border-radius: 20px; 
+      padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); color: #dae3ed; 
+    }
+
+    .top-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3d4a55; padding-bottom: 14px; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+    .logo-area { display: flex; align-items: center; gap: 14px; }
+    .logo-main { font-weight: 700; font-size: 22px; color: #e6c884; text-transform: uppercase; }
+    .logo-sub { font-size: 14px; color: #b0c9dd; }
+
+    .nav-links a { color: #d5c294; text-decoration: none; margin-left: 20px; cursor: pointer; font-weight: 600; }
+    .nav-links a:hover { color: #fff; }
+
+    .fsb-emblem { width: 60px; height: 60px; background: #141a21; border-radius: 50%; border: 2px solid #b89b6b; overflow: hidden; }
+    .fsb-emblem img { width: 100%; height: 100%; object-fit: cover; }
+
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 9999; }
+    .modal-box { background: #141a21; padding: 30px; border-radius: 15px; width: 400px; border: 1px solid #b89b6b; }
+    
+    .tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #3d4a55; }
+    .tab-btn { flex: 1; padding: 12px; text-align: center; background: none; border: none; color: #8ea7bb; font-size: 18px; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab-btn.active { color: #e6c884; border-bottom: 2px solid #b89b6b; }
+
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; color: #b6ccdf; margin-bottom: 5px; }
+    .form-group input, .form-group select { width: 100%; padding: 12px; background: #1b252f; border: 1px solid #4b6d86; color: #fff; border-radius: 8px; }
+    .form-group textarea { width: 100%; padding: 12px; background: #1b252f; border: 1px solid #4b6d86; color: #fff; border-radius: 8px; resize: vertical; }
+    .submit-btn { width: 100%; padding: 12px; background: #1d3547; color: #fff; border: 1px solid #b89b6b; border-radius: 8px; cursor: pointer; font-weight: 700; }
+    .close-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #b89b6b; font-size: 20px; cursor: pointer; }
+
+    .dashboard { display: none; margin-top: 20px; }
+    .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border: 1px solid #b89b6b; border-radius: 10px; padding: 15px; background: #1b252f; }
+    .dash-header h2 { color: #e6c884; font-size: 24px; }
+    
+    .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .nav-tab { padding: 12px 20px; background: rgba(29, 53, 71, 0.9); border: 1px solid #b89b6b; color: #e6c884; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .nav-tab.active { background: #b89b6b; color: #141a21; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+    
+    .perm-info { font-size: 14px; color: #8ea7bb; margin-bottom: 20px; }
+
+    .card { background: #1b252f; border: 1px solid #314653; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+    .card h4 { color: #e3eef9; margin-bottom: 5px; }
+    .card p { color: #b3c9db; font-size: 14px; }
+    .card .meta { color: #8ea7bb; font-size: 12px; margin-top: 8px; }
+
+    .user-row { display: flex; justify-content: space-between; align-items: center; background: #1b252f; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #314653; }
+    .user-info { flex-grow: 1; }
+    .admin-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    .warnings { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+    .warn-badge { padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .warn-0 { background: #2b4457; color: #e6c884; }
+    .warn-1 { background: #5a2a2a; color: #ff6b6b; }
+    .warn-2 { background: #8b0000; color: #fff; }
+    
+    .btn { display: inline-block; padding: 10px 20px; background: #1d3547; color: #fff; border: 1px solid #b89b6b; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn:hover { background: #2b4457; }
+    .btn-danger { background: #5a2a2a; border-color: #884444; }
+    .btn-success { background: #2d5a2a; border-color: #449944; }
+
+    .status-badge { padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
+    .status-pending { background: #b89b6b; color: #141a21; }
+    .status-approved { background: #2d5a2a; color: #fff; }
+    .status-rejected { background: #8b0000; color: #fff; }
+
+    @media (max-width: 700px) {
+      .top-bar { flex-direction: column; align-items: flex-start; }
+      .nav-tab { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="site-card">
+    <div class="top-bar">
+      <div class="logo-area">
+        <div class="fsb-emblem"><img src="logo.jpg" alt="Логотип"></div>
+        <div>
+          <div class="logo-main">УФСБ по ДНР</div>
+          <div class="logo-sub">Управление ФСБ по ДНР</div>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="#" onclick="showHome()">Главная</a>
+        <a href="https://base.garant.ru/10104197/" target="_blank"><i class="fas fa-gavel"></i> Наш Закон</a>
+        <a href="#" onclick="openModal()"><i class="fas fa-user-shield"></i> Личный кабинет</a>
+      </div>
+    </div>
+    
+    <div id="homePage">
+      <h1 class="main-title" style="color: #e6c884; font-size: 54px; text-shadow: 0 0 10px #000;">УФСБ по ДНР</h1>
+      <div class="title-sub" style="margin-top: 10px;"><span style="color: #d5c294; border-left: 3px solid #b89b6b; padding-left: 18px;">MST: Операция</span></div>
+      
+      <div style="background: rgba(20, 30, 40, 0.8); padding: 22px; border-left: 5px solid #b89b6b; margin-top: 20px;">
+        Мы — подразделение, действующее в составе сервера Garry's Mod MST «Операция». Здесь мы публикуем новости, ведём учёт личного состава и готовим бойцов к операциям.
+      </div>
+      
+      <div style="margin-top: 20px;">
+        <button class="btn" onclick="openModal()"><i class="fas fa-user-shield"></i> Личный кабинет</button>
+      </div>
+    </div>
+    
+    <div class="dashboard" id="dashboard">
+      <div class="dash-header">
+        <div>
+          <h2>Панель управления</h2>
+          <span id="userStatus" style="color: #8ea7bb;"></span>
+        </div>
+        <button class="btn btn-danger" onclick="logout()">Выйти</button>
+      </div>
+      
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchDashTab('registry')">Реестр состава</button>
+        <button class="nav-tab" onclick="switchDashTab('briefing')">Сводка</button>
+        <button class="nav-tab" onclick="switchDashTab('tasks')">Задачи</button>
+        <button class="nav-tab" onclick="switchDashTab('reports')">Рапорты</button>
+        <button class="nav-tab" onclick="switchDashTab('petitions')">Ходатайства</button>
+      </div>
+      
+      <div class="section active" id="registry">
+        <div class="perm-info">Доступ: <b>Все</b> | Редактирование: <b>Зам. Командира и выше</b></div>
+        <h3 style="color: #e6c884; margin-bottom: 15px;">Список личного состава</h3>
+        <div id="userList"></div>
+      </div>
+      
+      <div class="section" id="briefing">
+        <div class="perm-info">Доступ: <b>Все</b> | Создание: <b>Инструктор и выше</b></div>
+        <div style="margin-bottom: 15px;">
+          <button class="btn" onclick="showPostForm()" style="display: none;" id="createPostBtn"><i class="fas fa-plus"></i> Написать пост</button>
+        </div>
+        <h3 style="color: #e6c884; margin-bottom: 15px;">Сводка</h3>
+        <div id="postsList"></div>
+      </div>
+      
+      <div class="section" id="tasks">
+        <div class="perm-info">Доступ: <b>Все</b> | Создание: <b>Зам. Командира и выше</b></div>
+        <div style="margin-bottom: 15px;">
+          <button class="btn" onclick="showTaskForm()" style="display: none;" id="createTaskBtn"><i class="fas fa-plus"></i> Создать задачу</button>
+        </div>
+        <h3 style="color: #e6c884; margin-bottom: 15px;">Задачи</h3>
+        <div id="tasksList"></div>
+      </div>
+      
+      <!-- RAPORTS -->
+      <div class="section" id="reports">
+        <div class="perm-info">Доступ: <b>Все</b> | Создание: <b>Все</b> | Удаление: <b>Зам. Командира и выше</b></div>
+        <div style="margin-bottom: 15px;">
+          <button class="btn" onclick="showReportForm()"><i class="fas fa-plus"></i> Написать рапорт</button>
+        </div>
+        <h3 style="color: #e6c884; margin-bottom: 15px;">Рапорты</h3>
+        <div id="reportsList"></div>
+      </div>
+      
+      <!-- PETITIONS -->
+      <div class="section" id="petitions">
+        <div class="perm-info">Доступ: <b>Все</b> | Создание: <b>Все</b> | Удаление: <b>Зам. Командира и выше</b></div>
+        <div style="margin-bottom: 15px;">
+          <button class="btn" onclick="showPetitionForm()"><i class="fas fa-plus"></i> Подать ходатайство</button>
+        </div>
+        <h3 style="color: #e6c884; margin-bottom: 15px;">Ходатайства</h3>
+        <div id="petitionsList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка входа -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal-box" style="position: relative;">
+    <button class="close-btn" onclick="closeModal()">✖</button>
+    <div class="tabs">
+      <button class="tab-btn active" id="loginTab" onclick="switchTab('login')">Вход</button>
+      <button class="tab-btn" id="registerTab" onclick="switchTab('register')">Регистрация</button>
+    </div>
+
+    <div id="loginForm">
+      <div class="form-group"><label>Позывной</label><input type="text" id="loginCallSign"></div>
+      <div class="form-group"><label>Пароль</label><input type="password" id="loginPass"></div>
+      <div class="error-msg" style="color: #ff6b6b; display: none; margin-bottom: 10px;" id="loginError">Неверный позывной или пароль!</div>
+      <button class="submit-btn" onclick="login()">Войти</button>
+    </div>
+
+    <div id="registerForm" style="display: none;">
+      <div class="form-group"><label>STEAM_0:</label><input type="text" id="regSteam"></div>
+      <div class="form-group"><label>Позывной</label><input type="text" id="regCallSign"></div>
+      
+      <div class="form-group"><label>Звание (до Лейтенанта)</label><select id="regRank">
+        <option value="Прапорщик">Прапорщик</option>
+        <option value="Старший Прапорщик">Старший Прапорщик</option>
+        <option value="Лейтенант">Лейтенант</option>
+        <option value="Старший Лейтенант">Старший Лейтенант</option>
+      </select></div>
+      
+      <div class="form-group"><label>Должность (до Инструктора)</label><select id="regPost">
+        <option value="Оперативник">Оперативник</option>
+        <option value="Инструктор">Инструктор</option>
+      </select></div>
+      
+      <div class="form-group"><label>Пароль</label><input type="password" id="regPass"></div>
+      <div class="error-msg" style="color: #ff6b6b; display: none; margin-bottom: 10px;" id="regError"></div>
+      <button class="submit-btn" onclick="register()">Зарегистрироваться</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка Рапорта -->
+<div class="modal-overlay" id="reportModal" style="display: none; z-index: 9998;">
+  <div class="modal-box" style="position: relative;">
+    <button class="close-btn" onclick="closeReportModal()">✖</button>
+    <h3 style="color: #e6c884; margin-bottom: 20px;">Написать рапорт</h3>
+    <div class="form-group"><label>Заголовок</label><input type="text" id="reportTitle"></div>
+    <div class="form-group"><label>Текст</label><textarea id="reportContent" rows="4"></textarea></div>
+    <button class="submit-btn" onclick="createReport()">Отправить</button>
+  </div>
+</div>
+
+<!-- Модалка Ходатайства -->
+<div class="modal-overlay" id="petitionModal" style="display: none; z-index: 9998;">
+  <div class="modal-box" style="position: relative;">
+    <button class="close-btn" onclick="closePetitionModal()">✖</button>
+    <h3 style="color: #e6c884; margin-bottom: 20px;">Подать ходатайство</h3>
+    <div class="form-group"><label>Заголовок</label><input type="text" id="petitionTitle"></div>
+    <div class="form-group"><label>Текст</label><textarea id="petitionContent" rows="4"></textarea></div>
+    <button class="submit-btn" onclick="createPetition()">Отправить</button>
+  </div>
+</div>
+
+<script>
+  let currentUser = null;
+  let isAdmin = false;
+
+  function canEdit() { return isAdmin; }
+  
+  function canPost() {
+    return isAdmin || (currentUser && ['Инструктор', 'Заместитель Командира', 'Командир', 'Начальник УФСБ'].includes(currentUser.post));
+  }
+
+  function showHome() {
+    document.getElementById('homePage').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+  }
+
+  function openModal() {
+    document.getElementById('authModal').style.display = 'flex';
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('regError').style.display = 'none';
+  }
+  function closeModal() {
+    document.getElementById('authModal').style.display = 'none';
+  }
+  function switchTab(tab) {
+    document.getElementById('loginTab').classList.toggle('active', tab === 'login');
+    document.getElementById('registerTab').classList.toggle('active', tab === 'register');
+    document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+  }
+
+  async function login() {
+    const callSign = document.getElementById('loginCallSign').value;
+    const pass = document.getElementById('loginPass').value;
+    
+    const response = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callSign, pass }) });
+    const data = await response.json();
+
+    if (response.ok) {
+      currentUser = data;
+      isAdmin = data.role === 'admin' || ['Командир', 'Начальник УФСБ', 'Заместитель Командира'].includes(data.post);
+      
+      closeModal();
+      showDashboard();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }
+
+  async function register() {
+    const steam = document.getElementById('regSteam').value;
+    const callSign = document.getElementById('regCallSign').value;
+    const rank = document.getElementById('regRank').value;
+    const post = document.getElementById('regPost').value;
+    const pass = document.getElementById('regPass').value;
+
+    if (!steam || !callSign || !pass) {
+      document.getElementById('regError').innerText = "Заполните все поля!";
+      document.getElementById('regError').style.display = 'block';
+      return;
+    }
+
+    const response = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ steam, callSign, pass, rank, post }) });
+    const data = await response.json();
+
+    if (response.ok) {
+      alert("Аккаунт создан! Теперь войдите.");
+      switchTab('login');
+    } else {
+      document.getElementById('regError').innerText = data.error;
+      document.getElementById('regError').style.display = 'block';
+    }
+  }
+
+  function showDashboard() {
+    document.getElementById('homePage').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('userStatus').innerText = `Вы вошли как: ${currentUser.callSign} (${currentUser.rank}, ${currentUser.post})`;
+    
+    switchDashTab('registry');
+    loadUsers();
+  }
+
+  function switchDashTab(tab) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+    if (tab === 'registry') {
+      document.querySelectorAll('.nav-tab')[0].classList.add('active');
+      document.getElementById('registry').classList.add('active');
+      loadUsers();
+    } else if (tab === 'briefing') {
+      document.querySelectorAll('.nav-tab')[1].classList.add('active');
+      document.getElementById('briefing').classList.add('active');
+      document.getElementById('createPostBtn').style.display = canPost() ? 'block' : 'none';
+      loadPosts();
+    } else if (tab === 'tasks') {
+      document.querySelectorAll('.nav-tab')[2].classList.add('active');
+      document.getElementById('tasks').classList.add('active');
+      document.getElementById('createTaskBtn').style.display = canEdit() ? 'block' : 'none';
+      loadTasks();
+    } else if (tab === 'reports') {
+      document.querySelectorAll('.nav-tab')[3].classList.add('active');
+      document.getElementById('reports').classList.add('active');
+      loadReports();
+    } else if (tab === 'petitions') {
+      document.querySelectorAll('.nav-tab')[4].classList.add('active');
+      document.getElementById('petitions').classList.add('active');
+      loadPetitions();
+    }
+  }
+
+  function logout() {
+    currentUser = null;
+    isAdmin = false;
+    showHome();
+  }
+
+  async function loadUsers() {
+    const response = await fetch('/api/users');
+    const users = await response.json();
+    const list = document.getElementById('userList');
+    list.innerHTML = '';
+
+    users.forEach(user => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      
+      const warnClass = user.warnings === 0 ? 'warn-0' : (user.warnings === 1 ? 'warn-1' : 'warn-2');
+      const warnText = user.warnings === 0 ? 'Выговор 0' : (user.warnings === 1 ? 'Выговор 1' : 'Выговор 2');
+
+      let controls = '';
+      if (canEdit() && user.callSign !== 'Komandir') {
+        controls = `
+          <div class="admin-controls">
+            <select onchange="updateUser(${user.id}, 'rank', this.value)">
+              <option value="Прапорщик" ${user.rank === 'Прапорщик' ? 'selected' : ''}>Прапорщик</option>
+              <option value="Старший Прапорщик" ${user.rank === 'Старший Прапорщик' ? 'selected' : ''}>Ст. Прапорщик</option>
+              <option value="Лейтенант" ${user.rank === 'Лейтенант' ? 'selected' : ''}>Лейтенант</option>
+              <option value="Старший Лейтенант" ${user.rank === 'Старший Лейтенант' ? 'selected' : ''}>Ст. Лейтенант</option>
+              <option value="Капитан" ${user.rank === 'Капитан' ? 'selected' : ''}>Капитан</option>
+              <option value="Майор" ${user.rank === 'Майор' ? 'selected' : ''}>Майор</option>
+              <option value="Полковник" ${user.rank === 'Полковник' ? 'selected' : ''}>Полковник</option>
+              <option value="Генерал-Майор" ${user.rank === 'Генерал-Майор' ? 'selected' : ''}>Генерал-Майор</option>
+            </select>
+            <select onchange="updateUser(${user.id}, 'post', this.value)">
+              <option value="Оперативник" ${user.post === 'Оперативник' ? 'selected' : ''}>Оперативник</option>
+              <option value="Инструктор" ${user.post === 'Инструктор' ? 'selected' : ''}>Инструктор</option>
+              <option value="Заместитель Командира" ${user.post === 'Заместитель Командира' ? 'selected' : ''}>Зам. Командира</option>
+              <option value="Командир" ${user.post === 'Командир' ? 'selected' : ''}>Командир</option>
+              <option value="Начальник УФСБ" ${user.post === 'Начальник УФСБ' ? 'selected' : ''}>Нач. УФСБ</option>
+            </select>
+
+            <!-- Поля для изменения позывного и пароля -->
+            <input type="text" placeholder="Новый позывной" value="${user.callSign}" onchange="updateUser(${user.id}, 'callSign', this.value)" style="width: 120px; padding: 5px; background: #1b252f; border: 1px solid #4b6d86; color: #fff; border-radius: 5px;">
+            <input type="text" placeholder="Новый пароль" value="${user.pass}" onchange="updateUser(${user.id}, 'pass', this.value)" style="width: 120px; padding: 5px; background: #1b252f; border: 1px solid #4b6d86; color: #fff; border-radius: 5px;">
+
+            <button class="btn btn-danger" onclick="warnUser(${user.id}, 1)">+ Выговор</button>
+            <button class="btn" onclick="warnUser(${user.id}, -1)">- Выговор</button>
+
+            <button class="btn btn-danger" onclick="toggleRole(${user.id})">${user.role === 'admin' ? 'Снять права' : 'Дать права'}</button>
+            <button class="btn btn-danger" onclick="deleteUser(${user.id})">Удалить</button>
+          </div>
+        `;
+      }
+
+      row.innerHTML = `
+        <div class="user-info">
+          <b style="color: #fff;">${user.callSign}</b><br>
+          <small style="color: #8ea7bb;">${user.rank} • ${user.post}</small>
+          <div class="warnings">
+            <span class="warn-badge ${warnClass}">${warnText}</span>
+          </div>
+        </div>
+        ${controls}
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  async function updateUser(id, field, value) {
+    await fetch('/api/updateUser', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, field, value }) });
+    loadUsers();
+  }
+
+  async function deleteUser(id) {
+    if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
+    await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    loadUsers();
+  }
+
+  async function warnUser(id, amount) {
+    await fetch('/api/warn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, amount }) });
+    loadUsers();
+  }
+
+  async function toggleRole(id) {
+    await fetch('/api/toggleRole', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    loadUsers();
+  }
+
+  async function loadPosts() {
+    const response = await fetch('/api/posts');
+    const posts = await response.json();
+    const list = document.getElementById('postsList');
+    list.innerHTML = '';
+
+    posts.forEach(post => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <span style="background: #253f52; color: #e6c884; padding: 2px 10px; border-radius: 10px; font-size: 12px;">${post.tag}</span>
+        <h4 style="margin-top: 10px;">${post.title}</h4>
+        <p>${post.content}</p>
+        <div class="meta">Автор: ${post.author} • ${post.date}</div>
+        ${canPost() ? `<button class="btn btn-danger" style="margin-top: 10px; padding: 5px 10px;" onclick="deletePost(${post.id})">Удалить</button>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function showPostForm() {
+    document.getElementById('postModal').style.display = 'flex';
+  }
+  function closePostModal() {
+    document.getElementById('postModal').style.display = 'none';
+  }
+
+  async function createPost() {
+    const title = document.getElementById('postTitle').value;
+    const content = document.getElementById('postContent').value;
+    const tag = document.getElementById('postTag').value;
+
+    if (!title || !content) return alert('Заполните заголовок и текст!');
+
+    await fetch('/api/posts', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ title, content, tag, author: currentUser.callSign }) 
+    });
+
+    closePostModal();
+    document.getElementById('postTitle').value = '';
+    document.getElementById('postContent').value = '';
+    loadPosts();
+  }
+
+  async function deletePost(id) {
+    await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+    loadPosts();
+  }
+
+  async function loadTasks() {
+    const response = await fetch('/api/tasks');
+    const tasks = await response.json();
+    const list = document.getElementById('tasksList');
+    list.innerHTML = '';
+
+    tasks.forEach(task => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h4>${task.title}</h4>
+        <p>${task.content}</p>
+        <div class="meta">Автор: ${task.author} • ${task.date}</div>
+        ${canEdit() ? `<button class="btn btn-danger" style="margin-top: 10px; padding: 5px 10px;" onclick="deleteTask(${task.id})">Удалить</button>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function showTaskForm() {
+    document.getElementById('taskModal').style.display = 'flex';
+  }
+  function closeTaskModal() {
+    document.getElementById('taskModal').style.display = 'none';
+  }
+
+  async function createTask() {
+    const title = document.getElementById('taskTitle').value;
+    const content = document.getElementById('taskContent').value;
+
+    if (!title) return alert('Введите название задачи!');
+
+    await fetch('/api/tasks', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ title, content, author: currentUser.callSign }) 
+    });
+
+    closeTaskModal();
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskContent').value = '';
+    loadTasks();
+  }
+
+  async function deleteTask(id) {
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    loadTasks();
+  }
+
+  // РАПОРТЫ
+  async function loadReports() {
+    const response = await fetch('/api/reports');
+    const reports = await response.json();
+    const list = document.getElementById('reportsList');
+    list.innerHTML = '';
+
+    reports.forEach(report => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      
+      let statusHtml = '';
+      if (report.status === 'approved') statusHtml = '<span class="status-badge status-approved">Одобрено</span>';
+      else if (report.status === 'rejected') statusHtml = '<span class="status-badge status-rejected">Отказано</span>';
+      else statusHtml = '<span class="status-badge status-pending">На рассмотрении</span>';
+
+      card.innerHTML = `
+        ${statusHtml}
+        <h4>${report.title}</h4>
+        <p>${report.content}</p>
+        <div class="meta">Автор: ${report.author} • ${report.date}</div>
+        ${canEdit() ? `
+          <div style="margin-top: 10px; display: flex; gap: 10px;">
+            <button class="btn btn-success" onclick="setReportStatus(${report.id}, 'approved')">Одобрить</button>
+            <button class="btn btn-danger" onclick="setReportStatus(${report.id}, 'rejected')">Отказать</button>
+          </div>
+        ` : ''}
+        ${canEdit() ? `<button class="btn btn-danger" style="margin-top: 10px;" onclick="deleteReport(${report.id})">Удалить</button>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function showReportForm() {
+    document.getElementById('reportModal').style.display = 'flex';
+  }
+  function closeReportModal() {
+    document.getElementById('reportModal').style.display = 'none';
+  }
+
+  async function createReport() {
+    const title = document.getElementById('reportTitle').value;
+    const content = document.getElementById('reportContent').value;
+
+    if (!title || !content) return alert('Заполните заголовок и текст!');
+
+    await fetch('/api/reports', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ title, content, author: currentUser.callSign }) 
+    });
+
+    closeReportModal();
+    document.getElementById('reportTitle').value = '';
+    document.getElementById('reportContent').value = '';
+    loadReports();
+  }
+
+  async function setReportStatus(id, status) {
+    await fetch('/api/reports/status', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ id, status }) 
+    });
+    loadReports();
+  }
+
+  async function deleteReport(id) {
+    await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+    loadReports();
+  }
+
+  // ХОДАТАЙСТВА
+  async function loadPetitions() {
+    const response = await fetch('/api/petitions');
+    const petitions = await response.json();
+    const list = document.getElementById('petitionsList');
+    list.innerHTML = '';
+
+    petitions.forEach(petition => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      
+      let statusHtml = '';
+      if (petition.status === 'approved') statusHtml = '<span class="status-badge status-approved">Одобрено</span>';
+      else if (petition.status === 'rejected') statusHtml = '<span class="status-badge status-rejected">Отказано</span>';
+      else statusHtml = '<span class="status-badge status-pending">На рассмотрении</span>';
+
+      card.innerHTML = `
+        ${statusHtml}
+        <h4>${petition.title}</h4>
+        <p>${petition.content}</p>
+        <div class="meta">Автор: ${petition.author} • ${petition.date}</div>
+        ${canEdit() ? `
+          <div style="margin-top: 10px; display: flex; gap: 10px;">
+            <button class="btn btn-success" onclick="setPetitionStatus(${petition.id}, 'approved')">Одобрить</button>
+            <button class="btn btn-danger" onclick="setPetitionStatus(${petition.id}, 'rejected')">Отказать</button>
+          </div>
+        ` : ''}
+        ${canEdit() ? `<button class="btn btn-danger" style="margin-top: 10px;" onclick="deletePetition(${petition.id})">Удалить</button>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function showPetitionForm() {
+    document.getElementById('petitionModal').style.display = 'flex';
+  }
+  function closePetitionModal() {
+    document.getElementById('petitionModal').style.display = 'none';
+  }
+
+  async function createPetition() {
+    const title = document.getElementById('petitionTitle').value;
+    const content = document.getElementById('petitionContent').value;
+
+    if (!title || !content) return alert('Заполните заголовок и текст!');
+
+    await fetch('/api/petitions', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ title, content, author: currentUser.callSign }) 
+    });
+
+    closePetitionModal();
+    document.getElementById('petitionTitle').value = '';
+    document.getElementById('petitionContent').value = '';
+    loadPetitions();
+  }
+
+  async function setPetitionStatus(id, status) {
+    await fetch('/api/petitions/status', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ id, status }) 
+    });
+    loadPetitions();
+  }
+
+  async function deletePetition(id) {
+    await fetch(`/api/petitions/${id}`, { method: 'DELETE' });
+    loadPetitions();
+  }
+</script>
+</body>
+</html>
