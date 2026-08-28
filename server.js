@@ -1,210 +1,276 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
+const { Pool } = require('pg'); // Подключаем базу данных
 const path = require('path');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+// Подключение к базе данных через переменную окружения
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // SSL для Render
+});
 
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname)));
 
-const DB_FILE = path.join(__dirname, 'users.json');
-const POSTS_FILE = path.join(__dirname, 'posts.json');
-const TASKS_FILE = path.join(__dirname, 'tasks.json');
-const REPORTS_FILE = path.join(__dirname, 'reports.json');
-const PETITIONS_FILE = path.join(__dirname, 'petitions.json');
-
-let users = [];
-let posts = [];
-let tasks = [];
-let reports = [];
-let petitions = [];
-
-if (fs.existsSync(DB_FILE)) users = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-if (fs.existsSync(POSTS_FILE)) posts = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8'));
-if (fs.existsSync(TASKS_FILE)) tasks = JSON.parse(fs.readFileSync(TASKS_FILE, 'utf8'));
-if (fs.existsSync(REPORTS_FILE)) reports = JSON.parse(fs.readFileSync(REPORTS_FILE, 'utf8'));
-if (fs.existsSync(PETITIONS_FILE)) petitions = JSON.parse(fs.readFileSync(PETITIONS_FILE, 'utf8'));
-
-// Фикс: добавляем warnings: 0 всем, у кого его нет
-users = users.map(u => ({ ...u, warnings: u.warnings || 0 }));
-
-// Фикс: добавляем status: "pending" всем рапортам и ходатайствам
-reports = reports.map(r => ({ ...r, status: r.status || "pending" }));
-petitions = petitions.map(p => ({ ...p, status: p.status || "pending" }));
-
-// Главный админ
-if (users.length === 0) {
-    users.push({ id: 1, steam: "STEAM_0:0:111111111", callSign: "Komandir", pass: "123", rank: "Начальник УФСБ", post: "Начальник УФСБ", role: "admin", warnings: 0 });
-    fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2));
+// --- СОЗДАНИЕ ТАБЛИЦ (выполняется один раз при запуске) ---
+async function initDB() {
+  try {
+    // Таблица пользователей
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        callSign VARCHAR(100) UNIQUE NOT NULL,
+        pass VARCHAR(100) NOT NULL,
+        rank VARCHAR(50),
+        post VARCHAR(50),
+        role VARCHAR(20) DEFAULT 'user',
+        steam VARCHAR(100),
+        warnings INT DEFAULT 0
+      )
+    `);
+    
+    // Таблица постов
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200),
+        content TEXT,
+        tag VARCHAR(50),
+        author VARCHAR(100),
+        date VARCHAR(20)
+      )
+    `);
+    
+    // Таблица задач
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200),
+        content TEXT,
+        author VARCHAR(100),
+        date VARCHAR(20)
+      )
+    `);
+    
+    // Таблица рапортов
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200),
+        content TEXT,
+        author VARCHAR(100),
+        date VARCHAR(20),
+        status VARCHAR(20) DEFAULT 'pending'
+      )
+    `);
+    
+    // Таблица ходатайств
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS petitions (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200),
+        content TEXT,
+        author VARCHAR(100),
+        date VARCHAR(20),
+        status VARCHAR(20) DEFAULT 'pending'
+      )
+    `);
+    
+    // Проверяем, есть ли уже главный админ, если нет - создаем
+    const adminCheck = await pool.query("SELECT * FROM users WHERE callSign = 'Komandir'");
+    if (adminCheck.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO users (callSign, pass, rank, post, role, steam, warnings)
+        VALUES ('Komandir', '123', 'Начальник УФСБ', 'Начальник УФСБ', 'admin', 'STEAM_0:0:111111111', 0)
+      `);
+    }
+    
+    console.log('✅ База данных подключена и таблицы созданы!');
+  } catch (err) {
+    console.error('❌ Ошибка базы данных:', err.message);
+  }
 }
 
-function saveUsers() { fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2)); }
-function savePosts() { fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2)); }
-function saveTasks() { fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2)); }
-function saveReports() { fs.writeFileSync(REPORTS_FILE, JSON.stringify(reports, null, 2)); }
-function savePetitions() { fs.writeFileSync(PETITIONS_FILE, JSON.stringify(petitions, null, 2)); }
+initDB();
 
-// --- Регистрация ---
-app.post('/api/register', (req, res) => {
-    const { steam, callSign, pass, rank, post } = req.body;
-    if (!steam || !callSign || !pass) return res.status(400).json({ error: 'Заполните все поля!' });
-    if (users.some(u => u.callSign === callSign)) return res.status(400).json({ error: 'Позывной занят!' });
+// --- ПОЛЬЗОВАТЕЛИ ---
 
-    const allowedRanks = ['Прапорщик', 'Старший Прапорщик', 'Лейтенант', 'Старший Лейтенант'];
-    const allowedPosts = ['Оперативник', 'Инструктор'];
-
-    if (!allowedRanks.includes(rank)) return res.status(400).json({ error: 'Максимальное звание при регистрации: Лейтенант!' });
-    if (!allowedPosts.includes(post)) return res.status(400).json({ error: 'Максимальная должность при регистрации: Инструктор!' });
-
-    const newUser = { id: Date.now(), steam, callSign, pass, rank, post, role: "user", warnings: 0 };
-    users.push(newUser);
-    saveUsers();
-    res.json({ success: true });
+// Вход
+app.post('/api/login', async (req, res) => {
+  const { callSign, pass } = req.body;
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE callSign = $1 AND pass = $2", [callSign, pass]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Неверный позывной или пароль!' });
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Вход ---
-app.post('/api/login', (req, res) => {
-    const { callSign, pass } = req.body;
-    const user = users.find(u => u.callSign === callSign && u.pass === pass);
-    if (!user) return res.status(401).json({ error: 'Неверный позывной или пароль!' });
-    res.json(user);
-});
+// Регистрация (с ограничениями)
+app.post('/api/register', async (req, res) => {
+  const { steam, callSign, pass, rank, post } = req.body;
+  if (!steam || !callSign || !pass) return res.status(400).json({ error: 'Заполните все поля!' });
 
-// --- Получить всех ---
-app.get('/api/users', (req, res) => res.json(users));
+  const allowedRanks = ['Прапорщик', 'Старший Прапорщик', 'Лейтенант', 'Старший Лейтенант'];
+  const allowedPosts = ['Оперативник', 'Инструктор'];
 
-// --- Обновить пользователя (включая позывной и пароль) ---
-app.post('/api/updateUser', (req, res) => {
-    const { id, field, value } = req.body;
-    const user = users.find(u => u.id === id);
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-    if (user.callSign === "Komandir") return res.status(403).json({ error: 'Нельзя редактировать главного админа' });
+  if (!allowedRanks.includes(rank)) return res.status(400).json({ error: 'Максимальное звание при регистрации: Лейтенант!' });
+  if (!allowedPosts.includes(post)) return res.status(400).json({ error: 'Максимальная должность при регистрации: Инструктор!' });
+
+  try {
+    const check = await pool.query("SELECT * FROM users WHERE callSign = $1", [callSign]);
+    if (check.rows.length > 0) return res.status(400).json({ error: 'Позывной занят!' });
     
-    // Если меняем позывной, нужно проверить, что новый позывной не занят
+    await pool.query(`
+      INSERT INTO users (steam, callSign, pass, rank, post, role, warnings)
+      VALUES ($1, $2, $3, $4, $5, 'user', 0)
+    `, [steam, callSign, pass, rank, post]);
+    
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Получить всех
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM users");
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Обновить пользователя
+app.post('/api/updateUser', async (req, res) => {
+  const { id, field, value } = req.body;
+  try {
     if (field === 'callSign') {
-        const existing = users.find(u => u.callSign === value && u.id !== id);
-        if (existing) return res.status(400).json({ error: 'Этот позывной уже занят!' });
+      const check = await pool.query("SELECT * FROM users WHERE callSign = $1 AND id != $2", [value, id]);
+      if (check.rows.length > 0) return res.status(400).json({ error: 'Этот позывной уже занят!' });
     }
-
-    user[field] = value;
-    saveUsers();
+    await pool.query(`UPDATE users SET ${field} = $1 WHERE id = $2`, [value, id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Удалить пользователя ---
-app.delete('/api/users/:id', (req, res) => {
-    const userId = Number(req.params.id);
-    const user = users.find(u => u.id === userId);
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-    if (user.callSign === "Komandir") return res.status(403).json({ error: 'Нельзя удалить главного админа' });
-    users = users.filter(u => u.id !== userId);
-    saveUsers();
+// Удалить
+app.delete('/api/users/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  try {
+    await pool.query("DELETE FROM users WHERE id = $1", [id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Выговор ---
-app.post('/api/warn', (req, res) => {
-    const { id, amount } = req.body;
-    const user = users.find(u => u.id === id);
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-    if (user.callSign === "Komandir") return res.status(403).json({ error: 'Нельзя дать выговор главному админу' });
-    user.warnings = Math.max(0, (user.warnings || 0) + amount);
-    saveUsers();
+// Выговор
+app.post('/api/warn', async (req, res) => {
+  const { id, amount } = req.body;
+  try {
+    await pool.query("UPDATE users SET warnings = GREATEST(0, warnings + $1) WHERE id = $2", [amount, id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Права ---
-app.post('/api/toggleRole', (req, res) => {
-    const { id } = req.body;
-    const user = users.find(u => u.id === id);
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-    if (user.callSign === "Komandir") return res.status(403).json({ error: 'Нельзя менять главного админа' });
-    user.role = user.role === 'admin' ? 'user' : 'admin';
-    saveUsers();
+// Права
+app.post('/api/toggleRole', async (req, res) => {
+  const { id } = req.body;
+  try {
+    const result = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
+    const newRole = result.rows[0].role === 'admin' ? 'user' : 'admin';
+    await pool.query("UPDATE users SET role = $1 WHERE id = $2", [newRole, id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Посты ---
-app.get('/api/posts', (req, res) => res.json(posts));
-app.post('/api/posts', (req, res) => {
-    const { title, content, tag, author } = req.body;
-    if (!title || !content) return res.status(400).json({ error: 'Заполните поля' });
-    const newPost = { id: Date.now(), title, content, tag, author, date: new Date().toLocaleDateString('ru-RU') };
-    posts.push(newPost);
-    savePosts();
-    res.json({ success: true });
+// --- ПОСТЫ ---
+app.get('/api/posts', async (req, res) => {
+  try { res.json((await pool.query("SELECT * FROM posts ORDER BY id DESC")).rows); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.delete('/api/posts/:id', (req, res) => {
-    posts = posts.filter(p => p.id !== Number(req.params.id));
-    savePosts();
+app.post('/api/posts', async (req, res) => {
+  const { title, content, tag, author } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'Заполните поля' });
+  try {
+    await pool.query("INSERT INTO posts (title, content, tag, author, date) VALUES ($1, $2, $3, $4, $5)",
+      [title, content, tag, author, new Date().toLocaleDateString('ru-RU')]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/posts/:id', async (req, res) => {
+  try { await pool.query("DELETE FROM posts WHERE id = $1", [Number(req.params.id)]); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Задачи ---
-app.get('/api/tasks', (req, res) => res.json(tasks));
-app.post('/api/tasks', (req, res) => {
-    const { title, content, author } = req.body;
-    if (!title) return res.status(400).json({ error: 'Введите название задачи' });
-    const newTask = { id: Date.now(), title, content, author, date: new Date().toLocaleDateString('ru-RU') };
-    tasks.push(newTask);
-    saveTasks();
-    res.json({ success: true });
+// --- ЗАДАЧИ ---
+app.get('/api/tasks', async (req, res) => {
+  try { res.json((await pool.query("SELECT * FROM tasks ORDER BY id DESC")).rows); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.delete('/api/tasks/:id', (req, res) => {
-    tasks = tasks.filter(t => t.id !== Number(req.params.id));
-    saveTasks();
+app.post('/api/tasks', async (req, res) => {
+  const { title, content, author } = req.body;
+  if (!title) return res.status(400).json({ error: 'Введите название задачи' });
+  try {
+    await pool.query("INSERT INTO tasks (title, content, author, date) VALUES ($1, $2, $3, $4)",
+      [title, content, author, new Date().toLocaleDateString('ru-RU')]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/tasks/:id', async (req, res) => {
+  try { await pool.query("DELETE FROM tasks WHERE id = $1", [Number(req.params.id)]); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- РАПОРТЫ ---
-app.get('/api/reports', (req, res) => res.json(reports));
-app.post('/api/reports', (req, res) => {
-    const { title, content, author } = req.body;
-    if (!title || !content) return res.status(400).json({ error: 'Заполните поля' });
-    const newReport = { id: Date.now(), title, content, author, date: new Date().toLocaleDateString('ru-RU'), status: "pending" };
-    reports.push(newReport);
-    saveReports();
-    res.json({ success: true });
+app.get('/api/reports', async (req, res) => {
+  try { res.json((await pool.query("SELECT * FROM reports ORDER BY id DESC")).rows); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.post('/api/reports/status', (req, res) => {
-    const { id, status } = req.body;
-    const report = reports.find(r => r.id === id);
-    if (!report) return res.status(404).json({ error: 'Не найден' });
-    report.status = status;
-    saveReports();
+app.post('/api/reports', async (req, res) => {
+  const { title, content, author } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'Заполните поля' });
+  try {
+    await pool.query("INSERT INTO reports (title, content, author, date, status) VALUES ($1, $2, $3, $4, 'pending')",
+      [title, content, author, new Date().toLocaleDateString('ru-RU')]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.delete('/api/reports/:id', (req, res) => {
-    reports = reports.filter(r => r.id !== Number(req.params.id));
-    saveReports();
+app.post('/api/reports/status', async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    await pool.query("UPDATE reports SET status = $1 WHERE id = $2", [status, id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/reports/:id', async (req, res) => {
+  try { await pool.query("DELETE FROM reports WHERE id = $1", [Number(req.params.id)]); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- ХОДАТАЙСТВА ---
-app.get('/api/petitions', (req, res) => res.json(petitions));
-app.post('/api/petitions', (req, res) => {
-    const { title, content, author } = req.body;
-    if (!title || !content) return res.status(400).json({ error: 'Заполните поля' });
-    const newPetition = { id: Date.now(), title, content, author, date: new Date().toLocaleDateString('ru-RU'), status: "pending" };
-    petitions.push(newPetition);
-    savePetitions();
-    res.json({ success: true });
+app.get('/api/petitions', async (req, res) => {
+  try { res.json((await pool.query("SELECT * FROM petitions ORDER BY id DESC")).rows); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.post('/api/petitions/status', (req, res) => {
-    const { id, status } = req.body;
-    const petition = petitions.find(p => p.id === id);
-    if (!petition) return res.status(404).json({ error: 'Не найден' });
-    petition.status = status;
-    savePetitions();
+app.post('/api/petitions', async (req, res) => {
+  const { title, content, author } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'Заполните поля' });
+  try {
+    await pool.query("INSERT INTO petitions (title, content, author, date, status) VALUES ($1, $2, $3, $4, 'pending')",
+      [title, content, author, new Date().toLocaleDateString('ru-RU')]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.delete('/api/petitions/:id', (req, res) => {
-    petitions = petitions.filter(p => p.id !== Number(req.params.id));
-    savePetitions();
+app.post('/api/petitions/status', async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    await pool.query("UPDATE petitions SET status = $1 WHERE id = $2", [status, id]);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/petitions/:id', async (req, res) => {
+  try { await pool.query("DELETE FROM petitions WHERE id = $1", [Number(req.params.id)]); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.listen(PORT, () => {
-    console.log(`Сервер запущен! Откройте в браузере: http://localhost:3000`);
+  console.log(`Сервер запущен! Откройте в браузере: http://localhost:${PORT}`);
 });
