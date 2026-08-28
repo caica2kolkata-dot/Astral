@@ -73,13 +73,18 @@ async function initDB() {
 
 initDB();
 
+// Функция для преобразования поля callsign -> callSign
+function fixUser(u) {
+  return { ...u, callSign: u.callSign };
+}
+
 // --- ПОЛЬЗОВАТЕЛИ ---
 app.post('/api/login', async (req, res) => {
   const { callSign, pass } = req.body;
   try {
     const result = await pool.query("SELECT * FROM users WHERE callSign = $1 AND pass = $2", [callSign, pass]);
     if (result.rows.length === 0) return res.status(401).json({ error: 'Неверный позывной или пароль!' });
-    res.json(result.rows[0]);
+    res.json(fixUser(result.rows[0]));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -102,7 +107,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.get('/api/users', async (req, res) => {
-  try { res.json((await pool.query("SELECT * FROM users")).rows); }
+  try { res.json((await pool.query("SELECT * FROM users")).rows.map(fixUser)); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
