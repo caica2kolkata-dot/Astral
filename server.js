@@ -17,7 +17,7 @@ async function initDB() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
-      callSign VARCHAR(100) UNIQUE NOT NULL,
+      callsign VARCHAR(100) UNIQUE NOT NULL,
       pass VARCHAR(100) NOT NULL,
       rank VARCHAR(50),
       post VARCHAR(50),
@@ -61,9 +61,9 @@ async function initDB() {
       status VARCHAR(20) DEFAULT 'pending'
     )`);
     
-    const adminCheck = await pool.query(`SELECT * FROM users WHERE callSign = 'Komandir'`);
+    const adminCheck = await pool.query(`SELECT * FROM users WHERE callsign = 'Komandir'`);
     if (adminCheck.rows.length === 0) {
-      await pool.query(`INSERT INTO users (callSign, pass, rank, post, role, steam, warnings) VALUES ('Komandir', '123', 'Начальник УФСБ', 'Начальник УФСБ', 'admin', 'STEAM_0:0:111111111', 0)`);
+      await pool.query(`INSERT INTO users (callsign, pass, rank, post, role, steam, warnings) VALUES ('Komandir', '123', 'Начальник УФСБ', 'Начальник УФСБ', 'admin', 'STEAM_0:0:111111111', 0)`);
     }
     console.log('✅ База данных подключена!');
   } catch (err) {
@@ -73,16 +73,16 @@ async function initDB() {
 
 initDB();
 
-// Функция для преобразования поля callsign -> callSign
+// ФУНКЦИЯ, КОТОРАЯ ИСПРАВЛЯЕТ ПРОБЛЕМУ «UNDEFINED»:
 function fixUser(u) {
-  return { ...u, callSign: u.callSign };
+  return { ...u, callSign: u.callsign };
 }
 
 // --- ПОЛЬЗОВАТЕЛИ ---
 app.post('/api/login', async (req, res) => {
   const { callSign, pass } = req.body;
   try {
-    const result = await pool.query("SELECT * FROM users WHERE callSign = $1 AND pass = $2", [callSign, pass]);
+    const result = await pool.query("SELECT * FROM users WHERE callsign = $1 AND pass = $2", [callSign, pass]);
     if (result.rows.length === 0) return res.status(401).json({ error: 'Неверный позывной или пароль!' });
     res.json(fixUser(result.rows[0]));
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -99,9 +99,9 @@ app.post('/api/register', async (req, res) => {
   if (!allowedPosts.includes(post)) return res.status(400).json({ error: 'Максимальная должность при регистрации: Инструктор!' });
 
   try {
-    const check = await pool.query("SELECT * FROM users WHERE callSign = $1", [callSign]);
+    const check = await pool.query("SELECT * FROM users WHERE callsign = $1", [callSign]);
     if (check.rows.length > 0) return res.status(400).json({ error: 'Позывной занят!' });
-    await pool.query(`INSERT INTO users (steam, callSign, pass, rank, post, role, warnings) VALUES ($1, $2, $3, $4, $5, 'user', 0)`, [steam, callSign, pass, rank, post]);
+    await pool.query(`INSERT INTO users (steam, callsign, pass, rank, post, role, warnings) VALUES ($1, $2, $3, $4, $5, 'user', 0)`, [steam, callSign, pass, rank, post]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -115,7 +115,7 @@ app.post('/api/updateUser', async (req, res) => {
   const { id, field, value } = req.body;
   try {
     if (field === 'callSign') {
-      const check = await pool.query("SELECT * FROM users WHERE callSign = $1 AND id != $2", [value, id]);
+      const check = await pool.query("SELECT * FROM users WHERE callsign = $1 AND id != $2", [value, id]);
       if (check.rows.length > 0) return res.status(400).json({ error: 'Этот позывной уже занят!' });
     }
     await pool.query(`UPDATE users SET ${field} = $1 WHERE id = $2`, [value, id]);
